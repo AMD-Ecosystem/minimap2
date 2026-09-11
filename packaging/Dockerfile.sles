@@ -1,0 +1,129 @@
+# Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+#
+# SPDX-License-Identifier: MIT
+# =============================================================================
+# SLES RPM Test Image
+# =============================================================================
+# Multi-stage: builds the .rpm on SLES-compatible SUSE BCI 15.x with ROCm,
+# then installs and smoke-tests the .rpm on a clean SLES-compatible image.
+#
+# Usage:
+#   docker build -f packaging/Dockerfile.sles \
+#     --build-arg SLES_VERSION=15.7 \
+#     --build-arg ROCM_VERSION=7.2.1 \
+#     -t minimap2-sles-test .
+#
+#   docker run --rm --device=/dev/kfd --device=/dev/dri minimap2-sles-test
+#
+# Build args:
+#   SLES_VERSION   SLES-compatible SUSE BCI 15.x base (default 15.7)
+#   ROCM_VERSION   e.g. 7.2.1
+#   GPUARCH        Semicolon-separated list of AMD GPU archs, e.g.
+#                  "gfx942;gfx950". Defaults to "gfx942;gfx950"
+#                  (MI300X/MI325X + MI350X/MI355X).
+# =============================================================================
+
+ARG SLES_VERSION=15.7
+ARG ROCM_VERSION=7.2.1
+
+# ---- Stage 1: Build the .rpm on SLES-compatible SUSE BCI with ROCm --------
+FROM registry.suse.com/bci/bci-base:${SLES_VERSION} AS builder
+
+ARG SLES_VERSION
+ARG ROCM_VERSION
+ARG GPUARCH=gfx942;gfx950
+
+# Install the AMD GPU / ROCm repo via the amdgpu-install RPM, then install
+# build toolchain and ROCm HIP SDK.
+RUN set -eu; \
+    MAJOR=$(echo "${ROCM_VERSION}" | cut -d. -f1); \
+    MINOR=$(echo "${ROCM_VERSION}" | cut -d. -f2); \
+    PATCH=$(echo "${ROCM_VERSION}" | cut -d. -f3); \
+    PATCH=${PATCH:-0}; \
+    VERNUM=$((MAJOR * 10000 + MINOR * 100 + PATCH)); \
+    zypper --non-interactive --no-gpg-checks install \
+        "https://repo.radeon.com/amdgpu-install/${ROCM_VERSION}/sle/${SLES_VERSION}/amdgpu-install-${ROCM_VERSION}.${VERNUM}-1.noarch.rpm" \
+    && zypper --gpg-auto-import-keys refresh \
+    && zypper --non-interactive install \
+        gcc gcc-c++ make git cmake ninja rpm-build zlib-devel \
+        python3-setuptools python3-wheel \
+        rocm-hip-sdk \
+    && zypper clean --all
+
+COPY . /src
+WORKDIR /src
+
+RUN cmake -S . -B /build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DGPU=AMD \
+      -DGPUARCH="${GPUARCH}" \
+      -DBUILD_SLES_RPM_PACKAGE=ON \
+      -DBUILD_EXTRA=OFF \
+      -DBUILD_TESTING=OFF \
+      -DCMAKE_INSTALL_PREFIX=/usr \
+    && cmake --build /build -j"$(nproc)" \
+    && cd /build && cpack -G RPM
+
+# ---- Stage 2: Test the .rpm on a clean SLES-compatible image --------------
+FROM registry.suse.com/bci/bci-base:${SLES_VERSION} AS test
+
+ARG SLES_VERSION
+ARG ROCM_VERSION
+
+# Install the AMD GPU / ROCm repo so zypper can resolve hip-runtime-amd deps
+RUN set -eu; \
+    MAJOR=$(echo "${ROCM_VERSION}" | cut -d. -f1); \
+    MINOR=$(echo "${ROCM_VERSION}" | cut -d. -f2); \
+    PATCH=$(echo "${ROCM_VERSION}" | cut -d. -f3); \
+    PATCH=${PATCH:-0}; \
+    VERNUM=$((MAJOR * 10000 + MINOR * 100 + PATCH)); \
+    zypper --non-interactive --no-gpg-checks install \
+        "https://repo.radeon.com/amdgpu-install/${ROCM_VERSION}/sle/${SLES_VERSION}/amdgpu-install-${ROCM_VERSION}.${VERNUM}-1.noarch.rpm" \
+    && zypper --gpg-auto-import-keys refresh \
+    && zypper clean --all
+
+# Install the .rpm built in stage 1.
+# hip-runtime-amd and libz1 are declared RPM dependencies of the package,
+# so zypper resolves them automatically from the ROCm repo added above.
+COPY --from=builder /build/packages/*.rpm /tmp/
+RUN zypper --non-interactive --no-gpg-checks install /tmp/*.rpm \
+    && rm -f /tmp/*.rpm
+
+# Smoke tests: verify installed files and all CLI tools
+RUN set -eux; \
+    echo "=== RPM package info ==="; \
+    rpm -qi amd-minimap2; \
+    echo "=== Installed files ==="; \
+    rpm -ql amd-minimap2; \
+    echo "=== Verify binaries ==="; \
+    minimap2 --version; \
+        mm2_seed  -h | head -3; \
+        mm2_chain -h | head -3; \
+        mm2_align -h | head -3; \
+        echo "=== Verify docs/man package payload entries ==="; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/minimap2\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_seed\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_chain\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_align\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/doc/minimap2/USAGE\.md$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/doc/minimap2/LICENSE\.txt$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/doc/minimap2/NEWS\.md$'; \
+        echo "=== Verify docs/man runtime files (best-effort) ==="; \
+        if [ -f /usr/share/man/man1/minimap2.1.gz ]; then \
+            test -f /usr/share/man/man1/mm2_seed.1.gz; \
+            test -f /usr/share/man/man1/mm2_chain.1.gz; \
+            test -f /usr/share/man/man1/mm2_align.1.gz; \
+        else \
+            echo "man pages not installed in runtime image (likely excludedocs), skipping strict file checks"; \
+        fi; \
+        if [ -f /usr/share/doc/minimap2/USAGE.md ]; then \
+            test -f /usr/share/doc/minimap2/LICENSE.txt; \
+            test -f /usr/share/doc/minimap2/NEWS.md; \
+        else \
+            echo "docs not installed in runtime image (likely excludedocs), skipping strict file checks"; \
+        fi; \
+    echo "=== Verify shared library ==="; \
+    test -f /usr/lib64/libminimap2.so; \
+    echo "=== Verify GPU config ==="; \
+    test -f /usr/share/minimap2/configs/gpu_config.json; \
+    echo "=== All checks passed ==="

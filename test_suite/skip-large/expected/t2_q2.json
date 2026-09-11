@@ -1,0 +1,107 @@
+{
+  "name": "skip_large_t2_q2",
+  "description": "Test data for skip-large: t2 vs q2",
+  "reference": {
+    "file": "../t2.fa"
+  },
+  "query": {
+    "file": "../q2.fa"
+  },
+  "index_params": {
+    "k": 15,
+    "w": 10
+  },
+  "queries": [
+    {
+      "name": "q1",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q2",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q3",
+      "expected_anchors": [
+        {
+          "x": "9223372049739684382",
+          "y": "2495"
+        },
+        {
+          "x": "9223372049739694486",
+          "y": "8739"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q4",
+      "expected_anchors": [
+        {
+          "x": "9223372079804457381",
+          "y": "10849"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q5",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q6",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q7",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q8",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q9",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q10",
+      "expected_anchors": [
+        {
+          "x": "12884905202",
+          "y": "3150"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q11",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q12",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    }
+  ]
+}

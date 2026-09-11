@@ -1,0 +1,150 @@
+# Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+#
+# SPDX-License-Identifier: MIT
+# =============================================================================
+# RHEL RPM Test Image
+# =============================================================================
+# Multi-stage: builds the .rpm on RHEL UBI with ROCm installed from the
+# AMD repo, then installs and smoke-tests the .rpm on a clean UBI image.
+#
+# Usage:
+#   docker build -f packaging/Dockerfile.rpm \
+#     --build-arg RHEL_VERSION=9 \
+#     --build-arg ROCM_VERSION=7.2.1 \
+#     -t minimap2-rpm-test .
+#
+#   docker run --rm --device=/dev/kfd --device=/dev/dri minimap2-rpm-test
+#
+# Supported RHEL_VERSION: 8, 9, 10
+#
+# Build args:
+#   RHEL_VERSION   8 | 9 | 10 (default 9)
+#   ROCM_VERSION   e.g. 7.2.1
+#   GPUARCH        Semicolon-separated list of AMD GPU archs, e.g.
+#                  "gfx942;gfx950". Defaults to "gfx942;gfx950"
+#                  (MI300X/MI325X + MI350X/MI355X).
+# =============================================================================
+
+ARG RHEL_VERSION=9
+ARG ROCM_VERSION=7.2.1
+
+# ---- Stage 1: Build the .rpm on RHEL UBI with ROCm -----------------------
+FROM registry.access.redhat.com/ubi${RHEL_VERSION}/ubi AS builder
+
+ARG RHEL_VERSION=9
+ARG ROCM_VERSION=7.2.1
+ARG GPUARCH=gfx942;gfx950
+
+# Install the AMD GPU / ROCm repo, EPEL, and enable CRB for ROCm dependencies.
+# The amdgpu-install RPM creates repo files using $releasever, which resolves to
+# the container's minor version (e.g. 9.3) instead of what AMD hosts (e.g. 9.7).
+# Strategy: install repo RPMs with amdgpu repos disabled, fix $releasever, then
+# install packages normally.
+RUN set -eu; \
+    MAJOR=$(echo "${ROCM_VERSION}" | cut -d. -f1); \
+    MINOR=$(echo "${ROCM_VERSION}" | cut -d. -f2); \
+    PATCH=$(echo "${ROCM_VERSION}" | cut -d. -f3); \
+    PATCH=${PATCH:-0}; \
+    VERNUM=$((MAJOR * 10000 + MINOR * 100 + PATCH)); \
+    case "${RHEL_VERSION}" in \
+        8)  repo_path="rhel/8";   el="el8";  crb="powertools"; releasever="8" ;; \
+        9)  repo_path="rhel/9.7"; el="el9";  crb="crb";        releasever="9.7" ;; \
+        10) repo_path="rhel/10";  el="el10"; crb="crb";        releasever="10" ;; \
+        *)  echo "Unsupported RHEL_VERSION=${RHEL_VERSION}"; exit 1 ;; \
+    esac; \
+    rpm -ivh --nodeps \
+        "https://repo.radeon.com/amdgpu-install/${ROCM_VERSION}/${repo_path}/amdgpu-install-${ROCM_VERSION}.${VERNUM}-1.${el}.noarch.rpm" \
+        "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${RHEL_VERSION}.noarch.rpm" \
+    && echo "${releasever}" > /etc/dnf/vars/amdgpudistro \
+    && dnf clean all \
+    && dnf install -y 'dnf-command(config-manager)' \
+    && /usr/bin/crb enable \
+    && dnf install -y --setopt=install_weak_deps=False \
+        gcc gcc-c++ make git cmake ninja-build rpm-build zlib-devel \
+        python3-setuptools python3-wheel \
+        rocm-hip-sdk \
+    && dnf clean all
+
+COPY . /src
+WORKDIR /src
+
+RUN cmake -S . -B /build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DGPU=AMD \
+      -DGPUARCH="${GPUARCH}" \
+      -DBUILD_RPM_PACKAGE=ON \
+      -DBUILD_EXTRA=OFF \
+      -DBUILD_TESTING=OFF \
+      -DCMAKE_INSTALL_PREFIX=/usr \
+    && cmake --build /build -j"$(nproc)" \
+    && cd /build && cpack -G RPM
+
+# ---- Stage 2: Test the .rpm on a clean RHEL UBI image ---------------------
+FROM registry.access.redhat.com/ubi${RHEL_VERSION}/ubi AS test
+
+ARG RHEL_VERSION=9
+ARG ROCM_VERSION=7.2.1
+
+# Install the AMD GPU / ROCm repo so dnf can resolve hip-runtime-amd deps
+RUN set -eu; \
+    MAJOR=$(echo "${ROCM_VERSION}" | cut -d. -f1); \
+    MINOR=$(echo "${ROCM_VERSION}" | cut -d. -f2); \
+    PATCH=$(echo "${ROCM_VERSION}" | cut -d. -f3); \
+    PATCH=${PATCH:-0}; \
+    VERNUM=$((MAJOR * 10000 + MINOR * 100 + PATCH)); \
+    case "${RHEL_VERSION}" in \
+        8)  repo_path="rhel/8";   el="el8";  releasever="8" ;; \
+        9)  repo_path="rhel/9.7"; el="el9";  releasever="9.7" ;; \
+        10) repo_path="rhel/10";  el="el10"; releasever="10" ;; \
+        *)  echo "Unsupported RHEL_VERSION=${RHEL_VERSION}"; exit 1 ;; \
+    esac; \
+    rpm -ivh --nodeps \
+        "https://repo.radeon.com/amdgpu-install/${ROCM_VERSION}/${repo_path}/amdgpu-install-${ROCM_VERSION}.${VERNUM}-1.${el}.noarch.rpm" \
+    && echo "${releasever}" > /etc/dnf/vars/amdgpudistro \
+    && dnf clean all
+
+# Install the .rpm built in stage 1.
+# hip-runtime-amd and zlib are declared RPM dependencies of the package,
+# so dnf resolves them automatically from the ROCm repo added above.
+COPY --from=builder /build/packages/*.rpm /tmp/
+RUN dnf install -y /tmp/*.rpm \
+    && rm -f /tmp/*.rpm
+
+# Smoke tests: verify installed files and all CLI tools
+RUN set -eux; \
+    echo "=== RPM package info ==="; \
+    rpm -qi amd-minimap2; \
+    echo "=== Installed files ==="; \
+    rpm -ql amd-minimap2; \
+    echo "=== Verify binaries ==="; \
+    minimap2 --version; \
+        mm2_seed  -h | head -3; \
+        mm2_chain -h | head -3; \
+        mm2_align -h | head -3; \
+        echo "=== Verify docs/man package payload entries ==="; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/minimap2\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_seed\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_chain\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_align\.1\.gz$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/doc/minimap2/USAGE\.md$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/doc/minimap2/LICENSE\.txt$'; \
+        rpm -ql amd-minimap2 | grep -q '^/usr/share/doc/minimap2/NEWS\.md$'; \
+        echo "=== Verify docs/man runtime files (best-effort) ==="; \
+        if [ -f /usr/share/man/man1/minimap2.1.gz ]; then \
+            test -f /usr/share/man/man1/mm2_seed.1.gz; \
+            test -f /usr/share/man/man1/mm2_chain.1.gz; \
+            test -f /usr/share/man/man1/mm2_align.1.gz; \
+        else \
+            echo "man pages not installed in runtime image (likely excludedocs), skipping strict file checks"; \
+        fi; \
+        if [ -f /usr/share/doc/minimap2/USAGE.md ]; then \
+            test -f /usr/share/doc/minimap2/LICENSE.txt; \
+            test -f /usr/share/doc/minimap2/NEWS.md; \
+        else \
+            echo "docs not installed in runtime image (likely excludedocs), skipping strict file checks"; \
+        fi; \
+    echo "=== Verify shared library ==="; \
+    test -f /usr/lib/x86_64-linux-gnu/libminimap2.so || test -f /usr/lib64/libminimap2.so; \
+    echo "=== Verify GPU config ==="; \
+    test -f /usr/share/minimap2/configs/gpu_config.json; \
+    echo "=== All checks passed ==="

@@ -1,0 +1,28 @@
+@PACKAGE_INIT@
+
+# minimap2 CMake Package Configuration
+#
+# Usage:
+#   find_package(minimap2 REQUIRED)
+#   target_link_libraries(your_target PRIVATE minimap2::minimap2)
+#
+# This will define:
+#   minimap2_FOUND        - True if minimap2 was found
+#   minimap2_INCLUDE_DIRS - Include directories for minimap2
+#   minimap2_LIBRARIES    - Libraries to link against
+#   minimap2_VERSION      - Version of minimap2
+
+include(CMakeFindDependencyMacro)
+
+# Find required dependencies
+find_dependency(ZLIB REQUIRED)
+find_dependency(Threads REQUIRED)
+
+# Include the targets file
+include("${CMAKE_CURRENT_LIST_DIR}/minimap2Targets.cmake")
+
+# Set legacy variables for compatibility
+get_target_property(minimap2_INCLUDE_DIRS minimap2::minimap2 INTERFACE_INCLUDE_DIRECTORIES)
+set(minimap2_LIBRARIES minimap2::minimap2)
+
+check_required_components(minimap2)

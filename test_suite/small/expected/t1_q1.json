@@ -1,0 +1,88 @@
+{
+  "name": "small_t1_q1",
+  "description": "Test data for small: t1 vs q1",
+  "reference": {
+    "file": "../t1.fa"
+  },
+  "query": {
+    "file": "../q1.fa"
+  },
+  "index_params": {
+    "k": 15,
+    "w": 10
+  },
+  "queries": [
+    {
+      "name": "q1",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q2",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q3",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q4",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q5",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q6",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q7",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q8",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q9",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q10",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q11",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q12",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    }
+  ]
+}

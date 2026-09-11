@@ -1,0 +1,152 @@
+{
+  "name": "skip_large_t1_q1",
+  "description": "Test data for skip-large: t1 vs q1",
+  "reference": {
+    "file": "../t1.fa"
+  },
+  "query": {
+    "file": "../q1.fa"
+  },
+  "index_params": {
+    "k": 15,
+    "w": 10
+  },
+  "queries": [
+    {
+      "name": "q1",
+      "expected_anchors": [
+        {
+          "x": "4962",
+          "y": "4656"
+        },
+        {
+          "x": "4963",
+          "y": "4657"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q2",
+      "expected_anchors": [
+        {
+          "x": "4294967441",
+          "y": "145"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q3",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q4",
+      "expected_anchors": [
+        {
+          "x": "12884904828",
+          "y": "2754"
+        },
+        {
+          "x": "12884915019",
+          "y": "12682"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q5",
+      "expected_anchors": [
+        {
+          "x": "17179872200",
+          "y": "3297"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q6",
+      "expected_anchors": [
+        {
+          "x": "21474843368",
+          "y": "6949"
+        },
+        {
+          "x": "21474843374",
+          "y": "6955"
+        },
+        {
+          "x": "21474843376",
+          "y": "6957"
+        },
+        {
+          "x": "9223372079804456416",
+          "y": "8981"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q7",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q8",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q9",
+      "expected_anchors": [
+        {
+          "x": "9223372079804449992",
+          "y": "1546"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q10",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q11",
+      "expected_anchors": [
+        {
+          "x": "42949683655",
+          "y": "12043"
+        },
+        {
+          "x": "42949684405",
+          "y": "12793"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q12",
+      "expected_anchors": [
+        {
+          "x": "17179878485",
+          "y": "3015"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    }
+  ]
+}

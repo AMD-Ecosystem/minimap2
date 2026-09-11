@@ -1,0 +1,27 @@
+# Python dependencies for the helper scripts under scripts/
+# Install with: pip install -r scripts/requirements.txt
+#
+# These power benchmarking, profiling, test-data generation, downloads, and
+# intermediate comparison. The devcontainer installs them into /opt/venv.
+#
+# Note: amdsmi (AMD SMI Python bindings) is used optionally by
+# generate_benchmark_data.py for GPU telemetry. It is provided by the ROCm
+# installation (not PyPI) and imported under try/except, so it is not listed
+# here.
+
+# Data download + progress bars (download_*_data.py, generate_benchmark_data.py)
+requests>=2.28
+tqdm>=4.64
+
+# Zstd-compressed intermediate archives (generate_benchmark_data.py,
+# compare_benchmark_data.py)
+zstandard>=0.20
+
+# FlatBuffers runtime for the generated mm2.dump bindings in scripts/generated/
+# (generate_test_data.py, flatbuf_to_json.py, compare_binary_intermediates.py)
+flatbuffers>=23.0
+
+# Numeric + plotting for profiling/benchmark reports (generate_profiling_report.py,
+# compare_benchmark_data.py). matplotlib is only needed when graphs are emitted.
+numpy>=1.24
+matplotlib>=3.6

@@ -1,0 +1,164 @@
+.TH mm2_chain 1 "18 February 2026" "minimap2-2.24" "Bioinformatics tools"
+.SH NAME
+.PP
+mm2_chain \- chain seed anchors for minimap2 staged pipeline
+.SH SYNOPSIS
+.PP
+.B mm2_chain
+.RB [ -x
+.IR preset ]
+.RB [ options ]
+.I reference.fa
+.B -s
+.I seeds.json
+.B -o
+.I output.json
+.SH DESCRIPTION
+.PP
+.B mm2_chain
+is a CLI tool that performs the chaining stage of the minimap2 mapping
+pipeline. It connects seed anchors (from
+.BR mm2_seed (1))
+into co-linear chains using dynamic programming, and outputs them in JSON
+format for downstream processing by
+.BR mm2_align (1).
+.PP
+This tool supports GPU acceleration for chaining via the
+.B --use-gpu
+option, which requires a GPU configuration file.
+.PP
+For end-to-end alignment workflows, use
+.BR minimap2 (1)
+instead.
+.SH OPTIONS
+.SS Required arguments
+.TP 10
+.I reference.fa
+Reference FASTA file (used to load the minimizer index).
+.TP
+.BI -s \ FILE
+Input seeds JSON file (produced by
+.BR mm2_seed (1)).
+.TP
+.BI -o \ FILE
+Output chains JSON file.
+.SS Preset
+.TP 10
+.BI -x \ STR
+Preset configuration. Available presets:
+.BR map-ont ,
+.BR map-pb ,
+.BR map-hifi ,
+.BR asm5 / asm10 / asm20 ,
+.BR sr ,
+.BR splice .
+.SS Indexing options
+.TP 10
+.BI -k \ INT
+K-mer size [from input or 15].
+.TP
+.BI -w \ INT
+Minimizer window size [from input or 10].
+.SS Chaining options
+.TP 10
+.BI -g \ INT
+Maximum gap in reference/query [5000]. Stop chain extension if there
+are no minimizers within this many base pairs.
+.TP
+.BI -G \ INT
+Maximum gap on reference, overrides
+.B -g
+[0 = use
+.BR -g ].
+.TP
+.BI -b \ INT
+Bandwidth for DP chaining [500].
+.TP
+.BI -B \ INT
+Long-join bandwidth for ultra-long reads [0 = disabled].
+.TP
+.BI -n \ INT
+Minimum anchor count per chain [3]. Discard chains with fewer anchors.
+.TP
+.BI -c \ INT
+Minimum chain score [40]. Discard chains with a chaining score below
+this threshold.
+.TP
+.B -r
+Use RMQ (Range Minimum Query) algorithm. Faster for ultra-long reads.
+Incompatible with GPU chaining.
+.SS Advanced chaining options
+.TP 10
+.BI --max-chain-skip \ INT
+Max anchors to skip during chaining [25]. A heuristic that stops
+chaining early. Set to a large number to disable.
+.TP
+.BI --max-chain-iter \ INT
+Max chaining DP iterations [5000]. Limits quadratic time complexity
+in the worst case.
+.TP
+.BI --chain-gap-scale \ FLOAT
+Gap cost scaling factor [1.0].
+.TP
+.BI --chain-skip-scale \ FLOAT
+Skip cost scaling factor [1.0].
+.SS GPU options
+.TP 10
+.B --use-gpu
+Enable GPU acceleration for chaining. Requires a GPU configuration file.
+Incompatible with RMQ algorithm
+.RB ( -r ).
+.TP
+.BI --gpu-config \ FILE
+GPU configuration JSON file [gpu_config.json]. Specifies batch sizes,
+kernel parameters, and memory limits. See
+.BR minimap2 (1)
+for configuration details.
+.SS Other options
+.TP 10
+.B -h
+Show help message.
+.SH OUTPUT FORMAT
+.PP
+Output is a JSON file containing chained anchors for each query:
+.PP
+.nf
+{
+  "queries": [{
+    "name": "read1",
+    "n_chains": 1,
+    "chains": [{
+      "score": 345,
+      "length": 42
+    }]
+  }]
+}
+.fi
+.SH EXAMPLES
+.PP
+Basic chaining with ONT preset:
+.PP
+.RS 4
+.B mm2_chain -x map-ont ref.fa -s seeds.json -o chains.json
+.RE
+.PP
+GPU-accelerated chaining:
+.PP
+.RS 4
+.B mm2_chain --use-gpu --gpu-config gpu_config.json ref.fa -s seeds.json -o chains.json
+.RE
+.PP
+Custom chaining parameters:
+.PP
+.RS 4
+.B mm2_chain -x map-ont -g 10000 -b 1000 -n 2 -c 20 ref.fa -s seeds.json -o chains.json
+.RE
+.PP
+Using RMQ for ultra-long reads:
+.PP
+.RS 4
+.B mm2_chain -x map-ont -r ref.fa -s seeds.json -o chains.json
+.RE
+.SH SEE ALSO
+.PP
+mm2_seed(1), mm2_align(1), minimap2(1)

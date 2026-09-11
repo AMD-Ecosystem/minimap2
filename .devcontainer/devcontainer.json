@@ -1,0 +1,55 @@
+{
+    "name": "minimap2_devenv",
+    "build": {
+        "context": "..",
+        "dockerfile": "Dockerfile",
+        "args": {
+            "BASE_IMAGE": "rocm/dev-ubuntu-24.04:7.2-complete",
+            "USERNAME": "${localEnv:USER}"
+        }
+    },
+    "runArgs": [
+        "--device=/dev/kfd",
+        "--device=/dev/dri",
+        "--group-add=44",
+        "--group-add=109",
+        "--ipc=host",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_ADMIN",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--security-opt",
+        "apparmor=unconfined",
+        "--privileged",
+        "--shm-size=128G"
+    ],
+    "containerEnv": {
+        "ROCM_PATH": "/opt/rocm"
+    },
+    "remoteUser": "${localEnv:USER}",
+    "updateRemoteUserUID": true,
+    "postCreateCommand": ".devcontainer/postCreateCommand.sh",
+    "mounts": [
+        {
+            "source": "${localEnv:HOME}",
+            "target": "/host_home/",
+            "type": "bind"
+        },
+        {
+            "source": "${localEnv:HOME}/.ssh",
+            "target": "/home/${localEnv:USER}/.ssh",
+            "type": "bind"
+        }
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "eamodio.gitlens",
+                "ms-vscode.cpptools-extension-pack",
+                "mhutchie.git-graph",
+                "bierner.markdown-mermaid"
+            ]
+        }
+    }
+}

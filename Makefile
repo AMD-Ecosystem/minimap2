@@ -1,137 +1,147 @@
-CFLAGS=		-g -Wall -O2 -Wc++-compat #-Wextra
-CPPFLAGS=	-DHAVE_KALLOC
-INCLUDES=
-OBJS=		kthread.o kalloc.o misc.o bseq.o sketch.o sdust.o options.o index.o \
-			lchain.o align.o hit.o seed.o jump.o map.o format.o pe.o esterr.o splitidx.o \
-			ksw2_ll_sse.o
-PROG=		minimap2
-PROG_EXTRA=	sdust minimap2-lite
-LIBS=		-lm -lz -lpthread
+# Modifications Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+# GNUmakefile - CMake wrapper for minimap2
+# 
+# Usage:
+#   make                                    # Default AMD GPU build
+#   make GPU=AMD DEBUG=analyze              # AMD GPU with debug analyze mode
+#   make GPU=AMD GPUARCH=gfx942 DEBUG=analyze  # Specific architecture
+#   make GPU=NONE                           # CPU-only build
+#   make clean                              # Clean build directory
+#   make distclean                          # Remove all build artifacts
+#
+# Variables:
+#   GPU      - GPU type: AMD, NONE (default: AMD)
+#   GPUARCH  - GPU architecture: gfx942, gfx1030, etc. (optional, auto-detect if not set)
+#   DEBUG    - Debug mode: info, analyze, verbose (optional)
+#   BUILD_TYPE - CMake build type: Debug, Release, RelWithDebInfo (default: RelWithDebInfo)
+#   JOBS     - Number of parallel jobs (default: auto)
 
-ifneq ($(aarch64),)
-	arm_neon=1
+# Default values
+GPU ?= AMD
+BUILD_TYPE ?= RelWithDebInfo
+BUILD_DIR := build
+
+# Determine number of jobs
+JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+# CMake configuration options
+CMAKE_OPTS := -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
+CMAKE_OPTS += -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+# GPU configuration
+ifneq ($(GPU),)
+    CMAKE_OPTS += -DGPU=$(GPU)
 endif
 
-ifeq ($(arm_neon),) # if arm_neon is not defined
-ifeq ($(sse2only),) # if sse2only is not defined
-	OBJS+=ksw2_extz2_sse41.o ksw2_extd2_sse41.o ksw2_exts2_sse41.o ksw2_extz2_sse2.o ksw2_extd2_sse2.o ksw2_exts2_sse2.o ksw2_dispatch.o
-else                # if sse2only is defined
-	OBJS+=ksw2_extz2_sse.o ksw2_extd2_sse.o ksw2_exts2_sse.o
-endif
-else				# if arm_neon is defined
-	OBJS+=ksw2_extz2_neon.o ksw2_extd2_neon.o ksw2_exts2_neon.o
-    INCLUDES+=-Isse2neon
-ifeq ($(aarch64),)	#if aarch64 is not defined
-	CFLAGS+=-D_FILE_OFFSET_BITS=64 -mfpu=neon -fsigned-char
-else				#if aarch64 is defined
-	CFLAGS+=-D_FILE_OFFSET_BITS=64 -fsigned-char
-endif
+# GPU architecture (optional)
+ifneq ($(GPUARCH),)
+    CMAKE_OPTS += -DGPUARCH=$(GPUARCH)
 endif
 
-ifneq ($(asan),)
-	CFLAGS+=-fsanitize=address
-	LIBS+=-fsanitize=address -ldl
+# Debug mode (optional)
+ifneq ($(DEBUG),)
+    CMAKE_OPTS += -DDEBUG_MODE=$(DEBUG)
 endif
 
-ifneq ($(tsan),)
-	CFLAGS+=-fsanitize=thread
-	LIBS+=-fsanitize=thread -ldl
+# Additional options
+ifdef BUILD_TESTING
+    CMAKE_OPTS += -DBUILD_TESTING=$(BUILD_TESTING)
 endif
 
-.PHONY:all extra clean depend
-.SUFFIXES:.c .o
-
-.c.o:
-		$(CC) -c $(CFLAGS) $(CPPFLAGS) $(INCLUDES) $< -o $@
-
-all:$(PROG)
-
-extra:all $(PROG_EXTRA)
-
-minimap2:main.o libminimap2.a
-		$(CC) $(CFLAGS) main.o -o $@ -L. -lminimap2 $(LIBS)
-
-minimap2-lite:example.o libminimap2.a
-		$(CC) $(CFLAGS) $< -o $@ -L. -lminimap2 $(LIBS)
-
-libminimap2.a:$(OBJS)
-		$(AR) -csru $@ $(OBJS)
-
-sdust:sdust.c kalloc.o kalloc.h kdq.h kvec.h kseq.h ketopt.h sdust.h
-		$(CC) -D_SDUST_MAIN $(CFLAGS) $< kalloc.o -o $@ -lz
-
-# SSE-specific targets on x86/x86_64
-
-ifeq ($(arm_neon),)   # if arm_neon is defined, compile this target with the default setting (i.e. no -msse2)
-ksw2_ll_sse.o:ksw2_ll_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) -msse2 $(CPPFLAGS) $(INCLUDES) $< -o $@
+ifdef ENABLE_COVERAGE
+    CMAKE_OPTS += -DENABLE_COVERAGE=$(ENABLE_COVERAGE)
 endif
 
-ksw2_extz2_sse41.o:ksw2_extz2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) -msse4.1 $(CPPFLAGS) -DKSW_CPU_DISPATCH $(INCLUDES) $< -o $@
+ifdef ENABLE_ASAN
+    CMAKE_OPTS += -DENABLE_ASAN=$(ENABLE_ASAN)
+endif
 
-ksw2_extz2_sse2.o:ksw2_extz2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) -msse2 -mno-sse4.1 $(CPPFLAGS) -DKSW_CPU_DISPATCH -DKSW_SSE2_ONLY $(INCLUDES) $< -o $@
+ifdef ENABLE_TSAN
+    CMAKE_OPTS += -DENABLE_TSAN=$(ENABLE_TSAN)
+endif
 
-ksw2_extd2_sse41.o:ksw2_extd2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) -msse4.1 $(CPPFLAGS) -DKSW_CPU_DISPATCH $(INCLUDES) $< -o $@
+ifdef SSE2_ONLY
+    CMAKE_OPTS += -DSSE2_ONLY=$(SSE2_ONLY)
+endif
 
-ksw2_extd2_sse2.o:ksw2_extd2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) -msse2 -mno-sse4.1 $(CPPFLAGS) -DKSW_CPU_DISPATCH -DKSW_SSE2_ONLY $(INCLUDES) $< -o $@
+ifdef ARM_NEON
+    CMAKE_OPTS += -DARM_NEON=$(ARM_NEON)
+endif
 
-ksw2_exts2_sse41.o:ksw2_exts2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) -msse4.1 $(CPPFLAGS) -DKSW_CPU_DISPATCH $(INCLUDES) $< -o $@
+ifdef BUILD_EXTRA
+    CMAKE_OPTS += -DBUILD_EXTRA=$(BUILD_EXTRA)
+endif
 
-ksw2_exts2_sse2.o:ksw2_exts2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) -msse2 -mno-sse4.1 $(CPPFLAGS) -DKSW_CPU_DISPATCH -DKSW_SSE2_ONLY $(INCLUDES) $< -o $@
+# Phony targets
+.PHONY: all configure build clean distclean install test help
 
-ksw2_dispatch.o:ksw2_dispatch.c ksw2.h
-		$(CC) -c $(CFLAGS) -msse4.1 $(CPPFLAGS) -DKSW_CPU_DISPATCH $(INCLUDES) $< -o $@
+# Default target
+all: build
 
-# NEON-specific targets on ARM
+# Configure CMake
+configure: $(BUILD_DIR)/Makefile
 
-ksw2_extz2_neon.o:ksw2_extz2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) $(CPPFLAGS) -DKSW_SSE2_ONLY -D__SSE2__ $(INCLUDES) $< -o $@
+$(BUILD_DIR)/Makefile: CMakeLists.txt
+	@echo "Configuring with: cmake -S . -B $(BUILD_DIR) $(CMAKE_OPTS)"
+	@mkdir -p $(BUILD_DIR)
+	cmake -S . -B $(BUILD_DIR) $(CMAKE_OPTS)
 
-ksw2_extd2_neon.o:ksw2_extd2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) $(CPPFLAGS) -DKSW_SSE2_ONLY -D__SSE2__ $(INCLUDES) $< -o $@
+# Build target - always reconfigure to pick up variable changes
+build:
+	@echo "Configuring with: cmake -S . -B $(BUILD_DIR) $(CMAKE_OPTS)"
+	@mkdir -p $(BUILD_DIR)
+	cmake -S . -B $(BUILD_DIR) $(CMAKE_OPTS)
+	@echo "Building with $(JOBS) parallel jobs..."
+	cmake --build $(BUILD_DIR) -j $(JOBS)
 
-ksw2_exts2_neon.o:ksw2_exts2_sse.c ksw2.h kalloc.h
-		$(CC) -c $(CFLAGS) $(CPPFLAGS) -DKSW_SSE2_ONLY -D__SSE2__ $(INCLUDES) $< -o $@
+# Install target
+install: build
+	cmake --install $(BUILD_DIR)
 
-# other non-file targets
+# Run tests
+test: build
+	cd $(BUILD_DIR) && ctest --output-on-failure
 
+# Clean build artifacts
 clean:
-		rm -fr gmon.out *.o a.out $(PROG) $(PROG_EXTRA) *~ *.a *.dSYM build dist mappy*.so mappy.c python/mappy.c mappy.egg* .eggs
+	@if [ -d "$(BUILD_DIR)" ]; then \
+		cmake --build $(BUILD_DIR) --target clean 2>/dev/null || true; \
+	fi
 
-depend:
-		(LC_ALL=C; export LC_ALL; makedepend -Y -- $(CFLAGS) $(CPPFLAGS) -- *.c)
+# Remove build directory entirely
+distclean:
+	rm -rf $(BUILD_DIR)
+	rm -rf out
 
-# DO NOT DELETE
-
-align.o: minimap.h mmpriv.h bseq.h kseq.h ksw2.h kalloc.h
-bseq.o: bseq.h kvec.h kalloc.h kseq.h
-esterr.o: mmpriv.h minimap.h bseq.h kseq.h
-example.o: minimap.h kseq.h
-format.o: kalloc.h mmpriv.h minimap.h bseq.h kseq.h
-hit.o: mmpriv.h minimap.h bseq.h kseq.h kalloc.h khash.h
-index.o: kthread.h bseq.h minimap.h mmpriv.h kseq.h ksw2.h kalloc.h kvec.h
-index.o: khash.h ksort.h
-jump.o: mmpriv.h minimap.h bseq.h kseq.h
-kalloc.o: kalloc.h
-ksw2_extd2_sse.o: ksw2.h kalloc.h
-ksw2_exts2_sse.o: ksw2.h kalloc.h
-ksw2_extz2_sse.o: ksw2.h kalloc.h
-ksw2_ll_sse.o: ksw2.h kalloc.h
-kthread.o: kthread.h
-lchain.o: mmpriv.h minimap.h bseq.h kseq.h kalloc.h krmq.h
-main.o: bseq.h minimap.h mmpriv.h kseq.h ketopt.h
-map.o: kthread.h kvec.h kalloc.h sdust.h mmpriv.h minimap.h bseq.h kseq.h
-map.o: khash.h ksort.h
-misc.o: mmpriv.h minimap.h bseq.h kseq.h ksort.h
-options.o: mmpriv.h minimap.h bseq.h kseq.h
-pe.o: mmpriv.h minimap.h bseq.h kseq.h kvec.h kalloc.h ksort.h
-sdust.o: kalloc.h kdq.h kvec.h sdust.h
-seed.o: mmpriv.h minimap.h bseq.h kseq.h kalloc.h ksort.h
-sketch.o: kvec.h kalloc.h mmpriv.h minimap.h bseq.h kseq.h
-splitidx.o: mmpriv.h minimap.h bseq.h kseq.h
+# Help target
+help:
+	@echo "minimap2 CMake Build System"
+	@echo ""
+	@echo "Usage: make [TARGET] [OPTIONS]"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all (default)  - Configure and build"
+	@echo "  configure      - Configure CMake only"
+	@echo "  build          - Build the project"
+	@echo "  install        - Install to prefix"
+	@echo "  test           - Run tests"
+	@echo "  clean          - Clean build artifacts"
+	@echo "  distclean      - Remove build directory"
+	@echo "  help           - Show this help"
+	@echo ""
+	@echo "Options:"
+	@echo "  GPU=AMD|NONE           - GPU type (default: AMD)"
+	@echo "  GPUARCH=<arch>         - GPU architecture (e.g., gfx942, gfx1030)"
+	@echo "  DEBUG=info|analyze|verbose - Debug mode"
+	@echo "  BUILD_TYPE=<type>      - CMake build type (default: RelWithDebInfo)"
+	@echo "  SSE2_ONLY=ON           - Build x86 SSE kernels for SSE2 only (no SSE4.1)"
+	@echo "  ARM_NEON=ON            - Build SSE kernels for ARM via sse2neon (auto-detected)"
+	@echo "  JOBS=<n>               - Parallel jobs (default: auto)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make                              # Default AMD GPU build"
+	@echo "  make GPU=AMD DEBUG=analyze        # AMD with debug analyze"
+	@echo "  make GPU=AMD GPUARCH=gfx942 DEBUG=analyze"
+	@echo "  make GPU=NONE                     # CPU-only build"
+	@echo "  make BUILD_TYPE=Release           # Release build"
+	@echo "  make distclean && make            # Clean rebuild"

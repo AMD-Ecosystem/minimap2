@@ -1,8 +1,106 @@
+# ==========================
+# C / C++ build artifacts
+# ==========================
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dSYM
+*.d
+*.gch
+*.pch
+*.lib
+*.dll
+*.exe
+*.out
+.depend
+
+# ==========================
+# CMake
+# ==========================
+.cmake/**
+build/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+*.whl
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# ==========================
+# Editors / IDEs
+# ==========================
+.vscode/**
 .cproject
 .project
 .*.swp
-*.a
-*.o
-*.dSYM
-minimap2
+*~
+.idea/
+*.iml
+
+# ==========================
+# Profiling / tracing
+# ==========================
+Log/**
+trace/
+ncu/
+nsys/
+verf/
+*.ncu-rep
+*.nsys-rep
+*.qdrep
+
+# ==========================
+# Project-specific
+# ==========================
+# Generated output files (SAM, PAF, BAM, etc.)
+*.sam
+*.paf
+*.bam
+*.bai
+*_output*
+!scripts/test_output_formats.py
+
+# Debug data
+debug/**
+
+# Workloads / data directories
+workloads/
+data/
+
+# Generated C from Cython
 mappy.c
+
+# Packages / containers
+*.deb
+*.rpm
+*.sif
+
+packages
+tmp
+
+# ==========================
+# Devcontainer (local, per-user)
+# ==========================
+.devcontainer/localPostCreateCommand.sh
+minimap2/core/include/generated/
+scripts/generated/

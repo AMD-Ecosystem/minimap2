@@ -3,7 +3,7 @@ Mappy: Minimap2 Python Binding
 ==============================
 
 Mappy provides a convenient interface to `minimap2
-<https://github.com/lh3/minimap2>`_, a fast and accurate C program to align
+<https://github.com/ROCm-LS/minimap2>`_, a fast and accurate C program to align
 genomic and transcribe nucleotide sequences.
 
 Installation
@@ -20,9 +20,140 @@ or from the minimap2 github repo (`Cython <http://cython.org>`_ required):
 
 .. code:: shell
 
-	git clone https://github.com/lh3/minimap2
+	git clone https://github.com/ROCm-LS/minimap2
 	cd minimap2
-	python setup.py install
+	pip install .
+
+GPU Acceleration
+~~~~~~~~~~~~~~~~
+
+Mappy supports GPU acceleration for alignment on AMD and NVIDIA GPUs. To build
+with GPU support:
+
+.. code:: shell
+
+	# AMD GPU (default)
+	pip install .
+
+	# NVIDIA GPU
+	GPU=NVIDIA pip install .
+
+	# CPU only
+	GPU=NONE pip install .
+
+For development or direct CMake builds:
+
+.. code:: shell
+
+	cmake -B build -DGPU=AMD -DBUILD_PYTHON=ON
+	cmake --build build --target mappy_inplace
+
+Running on the GPU
+~~~~~~~~~~~~~~~~~~~
+
+GPU chaining and/or alignment are enabled per ``Aligner`` via keyword
+arguments. Each ``Aligner`` owns its own mapping context (the GPU worker pools
+and device list), so the existing ``map()`` API is unchanged — passing no
+``gpu_*`` argument keeps the CPU behavior exactly as before.
+
+.. code:: python
+
+	import mappy as mp
+
+	a = mp.Aligner("ref.mmi", preset="map-ont",
+	               gpu_chain=True,                 # GPU chaining
+	               gpu_align=True,                 # GPU alignment
+	               gpu_cfg="configs/gpu_config.json",
+	               gpu_devices=[0])                # one or more device ids
+
+	# Per-read mapping (unchanged API)
+	for name, seq, qual in mp.fastx_read("reads.fq"):
+	    for hit in a.map(seq):
+	        print(hit.ctg, hit.r_st, hit.r_en, hit.cigar_str)
+
+	# Batched mapping (recommended for the GPU): the whole batch is chained and
+	# aligned together, so the GPU is fed many reads per launch.
+	batch = [(name, seq) for name, seq, qual in mp.fastx_read("reads.fq")]
+	results = a.map_batch([s for _, s in batch], names=[n for n, _ in batch])
+	for hits in results:               # one entry per input sequence
+	    for hit in hits:
+	        print(hit.ctg, hit.r_st, hit.r_en, hit.cigar_str)
+
+GPU-related ``Aligner`` keyword arguments:
+
+* **gpu_chain** / **gpu_align**: enable GPU chaining / alignment (default
+  ``False`` = CPU).
+* **gpu_cfg**: path to a GPU chaining config JSON (see ``configs/``);
+  ``None`` auto-detects from the hardware.
+* **gpu_devices**: list of GPU device ids to use (e.g. ``[0, 1]``); defaults to
+  device ``0`` when any ``gpu_*`` flag is set.
+* **gpu_chain_workers**, **gpu_flush_threshold**, **gpu_batch_max_align**,
+  **gpu_batch_max_mem**, **gpu_accum_pool_size**, **gpu_batch_max_mem_cap**:
+  advanced tuning knobs mirroring the ``minimap2`` CLI GPU options.
+
+.. note::
+
+   ``map()`` dispatches the GPU **one read at a time** (a batch of size one),
+   which incurs a kernel launch and device synchronization per read. It exists
+   for feature/correctness parity with the CPU path; it is generally **slower**
+   than CPU per call. Use ``map_batch()`` (or a large ``ThreadPoolExecutor``
+   fan-out) to actually benefit from the GPU, which is designed to amortize
+   launch overhead across many reads.
+
+Concurrent mapping with ThreadPoolExecutor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``map()`` and ``map_batch()`` release the GIL during mapping. Run independent
+jobs concurrently by giving each worker its own ``Aligner`` (optionally pinned
+to a different GPU device):
+
+.. code:: python
+
+	from concurrent.futures import ThreadPoolExecutor
+	import mappy as mp
+
+	def map_worker(args):
+	    idx_path, query_file, device = args
+	    aln = mp.Aligner(idx_path, preset="map-ont",
+	                     gpu_chain=True, gpu_align=True,
+	                     gpu_cfg="configs/gpu_config.json",
+	                     gpu_devices=[device])
+	    seqs, names = [], []
+	    for name, seq, qual in mp.fastx_read(query_file):
+	        names.append(name); seqs.append(seq)
+	    return sum(len(h) for h in aln.map_batch(seqs, names=names))
+
+	jobs = [
+	    ("ref.mmi", "query1.fq", 0),
+	    ("ref.mmi", "query2.fq", 1),
+	    ("ref.mmi", "query3.fq", 0),
+	    ("ref.mmi", "query4.fq", 1),
+	]
+	with ThreadPoolExecutor(max_workers=4) as pool:
+	    results = list(pool.map(map_worker, jobs))
+
+
+Building Wheels for Distribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To build binary wheel packages for distribution:
+
+.. code:: shell
+
+	# Install build tools
+	pip install build twine
+
+	# Build wheel and source distribution
+	python -m build
+
+	# Optionally check distributions
+	twine check dist/*
+
+	# Install the wheel locally
+	pip install dist/*.whl
+
+The built wheel will be in the ``dist/`` directory. You can upload to PyPI using
+``twine upload dist/*`` (requires PyPI account and credentials).
 
 Usage
 -----

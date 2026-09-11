@@ -1,0 +1,46 @@
+# =============================================================================
+# Apptainer definition file for minimap2 (AMD GPU release)
+#
+# Converts the multi-stage Docker image into an Apptainer/Singularity container.
+#
+# Prerequisites:
+#   Build the Docker image first:
+#     docker build -f packaging/Dockerfile.deb -t minimap2-deb-test .
+#
+# Build:
+#   apptainer build minimap2.sif packaging/minimap2.def
+#
+# Run:
+#   apptainer run --rocm minimap2.sif minimap2 --version
+#   apptainer run --rocm minimap2.sif minimap2 -ax map-ont ref.fa reads.fq
+# =============================================================================
+
+Bootstrap: docker-daemon
+From: minimap2-deb-test:latest
+
+%labels
+    Author AMD Corporation
+    Description minimap2 - sequence alignment with AMD GPU acceleration
+    URL https://github.com/ROCm-LS/minimap2
+
+%help
+    minimap2 - A versatile pairwise aligner for genomic and spliced nucleotide sequences.
+
+    GPU-accelerated alignment (AMD GPUs):
+      apptainer run --rocm minimap2.sif minimap2 -ax map-ont \
+        --gpu-chain --gpu-cfg /usr/share/minimap2/configs/gpu_config.json --gpu-align \
+        ref.fa reads.fq > aln.sam
+
+    CPU-only alignment:
+      apptainer run minimap2.sif minimap2 -ax map-ont ref.fa reads.fq > aln.sam
+
+    Staged CLI tools:
+      apptainer exec minimap2.sif mm2_seed -x map-ont ref.fa reads.fq -o seeds.json
+      apptainer exec minimap2.sif mm2_chain -x map-ont ref.fa -s seeds.json -o chains.json
+      apptainer exec minimap2.sif mm2_align -x map-ont ref.fa reads.fq -c chains.json -o aln.sam
+
+%environment
+    export LC_ALL=C
+
+%runscript
+    exec "$@"

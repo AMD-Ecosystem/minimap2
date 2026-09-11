@@ -1,0 +1,41 @@
+# clang-tidy configuration for the minimap2 AMD fork.
+#
+# Broad, community-standard baseline: enable everything, then disable the
+# framework-specific and noisiest style families. The codebase does not satisfy
+# all of these yet — that is intentional. WarningsAsErrors is empty so tidy never
+# breaks the build; we adopt the rules incrementally and tighten over time.
+#
+# Opt-in: only runs when configured with -DMM_ENABLE_CLANG_TIDY=ON (default OFF).
+# Because hipcc is clang-based, these checks also cover HIP device code under
+# minimap2/**/gpu/. The high-value check for our past GPU illegal-memory-access
+# faults (a 32-bit index multiplied into a >2 GB device buffer) is
+# bugprone-implicit-widening-of-multiplication-result, which this set enables.
+---
+Checks: "*,
+        -abseil-*,
+        -altera-*,
+        -android-*,
+        -fuchsia-*,
+        -google-*,
+        -llvm*,
+        -modernize-use-trailing-return-type,
+        -zircon-*,
+        -readability-else-after-return,
+        -readability-static-accessed-through-instance,
+        -readability-avoid-const-params-in-decls,
+        -cppcoreguidelines-non-private-member-variables-in-classes,
+        -misc-non-private-member-variables-in-classes,
+        -misc-no-recursion,
+        -misc-use-anonymous-namespace,
+        -misc-use-internal-linkage
+"
+WarningsAsErrors: ''
+# Only diagnose first-party headers, not external/ or system headers.
+HeaderFilterRegex: 'minimap2/(align|chain|seed|core|src|include)/'
+FormatStyle:     file
+
+CheckOptions:
+  - key: readability-identifier-length.IgnoredVariableNames
+    value: 'x|y|z'
+  - key: readability-identifier-length.IgnoredParameterNames
+    value: 'x|y|z'
