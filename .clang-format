@@ -1,0 +1,70 @@
+---
+# Clang-format configuration for minimap2
+# Based on v2.24 style: tabs, Linux braces, minimal whitespace changes
+# Note: clang-format will still normalize some spacing (casts, operators)
+# This is expected behavior - focus is on preserving structure/indentation
+
+BasedOnStyle: LLVM
+
+# Core style matching v2.24
+IndentWidth: 8
+UseTab: Always
+TabWidth: 8
+ColumnLimit: 0
+BreakBeforeBraces: Linux
+PointerAlignment: Left
+
+# Preserve short statements
+AllowShortFunctionsOnASingleLine: All
+AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: false
+
+# Don't reformat function signatures aggressively
+AlignAfterOpenBracket: DontAlign
+BinPackArguments: true
+BinPackParameters: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowAllArgumentsOnNextLine: true
+
+# Minimal alignment
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignOperands: DontAlign
+AlignTrailingComments: false
+AlignEscapedNewlines: DontAlign
+
+# Spacing - preserve original cast style
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceBeforeParens: ControlStatements
+SpaceBeforeAssignmentOperators: true
+SpacesBeforeTrailingComments: 1
+SpaceInEmptyParentheses: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+BitFieldColonSpacing: Both
+
+# Keep pointer/reference symbols with type
+DerivePointerAlignment: false
+
+# Don't reorganize
+SortIncludes: Never
+IncludeBlocks: Preserve
+ReflowComments: false
+BreakStringLiterals: false
+
+# Minimize reformatting
+BreakBeforeBinaryOperators: None
+PenaltyReturnTypeOnItsOwnLine: 1000000
+PenaltyBreakBeforeFirstCallParameter: 1000000
+PenaltyBreakAssignment: 1000000
+
+# Other
+IndentCaseLabels: false
+IndentPPDirectives: None
+MaxEmptyLinesToKeep: 2
+KeepEmptyLinesAtTheStartOfBlocks: true
+Standard: c++11

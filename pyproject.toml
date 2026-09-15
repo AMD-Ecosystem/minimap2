@@ -1,2 +1,51 @@
+# Modifications Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
 [build-system]
-requires = ["setuptools", "wheel", "Cython"]
+requires = ["scikit-build-core>=0.8", "cython>=3.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "amd-mappy"
+dynamic = ["version"]
+description = "Minimap2 python binding"
+readme = "python/README.rst"
+license = {text = "MIT"}
+authors = [{ name = "AMD Corporation" }]
+keywords = ["sequence-alignment", "bioinformatics", "genomics"]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Programming Language :: C",
+    "Programming Language :: Cython",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[project.scripts]
+minimap2-python = "minimap2:main"
+
+[project.urls]
+Homepage = "https://github.com/ROCm-LS/minimap2"
+Documentation = "https://github.com/ROCm-LS/minimap2/blob/amd-integration-2.24/README.md"
+Repository = "https://github.com/ROCm-LS/minimap2"
+
+[tool.scikit-build]
+cmake.args = ["-DBUILD_PYTHON=ON", "-DBUILD_PYTHON_ONLY=ON", "-DBUILD_CLI_TOOLS=OFF", "-DBUILD_TESTING=OFF"]
+cmake.targets = ["mappy"]
+wheel.packages = []
+wheel.install-dir = "."
+sdist.include = ["python/*", "minimap2/**", "cJSON/*", "CMakeLists.txt", "cmake/*", "VERSION"]
+
+[tool.scikit-build.cmake.define]
+GPU = {env = "GPU", default = "AMD"}
+
+# Read PEP 440 version from VERSION file (e.g. "2.24.0", "2.25.0a1")
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "VERSION"
+regex = '(?P<value>\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?)'

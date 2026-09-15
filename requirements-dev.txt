@@ -1,0 +1,16 @@
+# Development dependencies for building and packaging mappy
+# Install with: pip install -r requirements-dev.txt
+
+# Build tools
+build>=1.0
+twine>=4.0
+
+# Required for building from source
+cython>=3.0
+
+# Testing and Python coverage (scripts/coverage.sh runs the mappy pytest suite
+# and emits pytest_coverage.json via pytest-cov + the Cython coverage plugin,
+# which ships with cython above)
+pytest>=7.0
+pytest-cov>=4.0
+coverage>=7.0

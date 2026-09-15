@@ -1,0 +1,148 @@
+.TH mm2_align 1 "18 February 2026" "minimap2-2.24" "Bioinformatics tools"
+.SH NAME
+.PP
+mm2_align \- perform base-level alignment for minimap2 staged pipeline
+.SH SYNOPSIS
+.PP
+.B mm2_align
+.RB [ -x
+.IR preset ]
+.RB [ options ]
+.I reference.fa
+.I query.fa
+.B -c
+.I chains.json
+.B -o
+.I output.json
+.SH DESCRIPTION
+.PP
+.B mm2_align
+is a CLI tool that performs the alignment (DP extension) stage of the
+minimap2 mapping pipeline. It takes chains (from
+.BR mm2_chain (1))
+and extends them into full base-level alignments with CIGAR strings.
+.PP
+This tool supports GPU acceleration for alignment via the
+.B --use-gpu
+option. Unlike GPU chaining, GPU alignment does not require a
+configuration file.
+.PP
+For end-to-end alignment workflows, use
+.BR minimap2 (1)
+instead.
+.SH OPTIONS
+.SS Required arguments
+.TP 10
+.I reference.fa
+Reference FASTA file.
+.TP
+.I query.fa
+Query FASTA/FASTQ file.
+.TP
+.BI -c \ FILE
+Input chains JSON file (produced by
+.BR mm2_chain (1)).
+.TP
+.BI -o \ FILE
+Output JSON file.
+.SS Preset
+.TP 10
+.BI -x \ STR
+Preset configuration. Available presets:
+.BR map-ont ,
+.BR map-pb ,
+.BR map-hifi ,
+.BR asm5 / asm10 / asm20 ,
+.BR sr ,
+.BR splice .
+.SS Indexing options
+.TP 10
+.BI -k \ INT
+K-mer size [15].
+.TP
+.BI -w \ INT
+Minimizer window size [10].
+.SS Alignment scoring options
+.TP 10
+.BI -A \ INT
+Matching score [2].
+.TP
+.BI -B \ INT
+Mismatch penalty [4]. Use a larger value for lower divergence.
+.TP
+.BI -O \ INT[,INT]
+Gap open penalty [4,24]. If the second value is not specified, it is
+set to the first value. A gap of length
+.I k
+costs
+.RI min{ O1 + k * E1 ,
+.IR O2 + k * E2 }.
+.TP
+.BI -E \ INT[,INT]
+Gap extension penalty [2,1].
+.TP
+.BI -z \ INT[,INT]
+Z-drop score and inversion Z-drop score [400,200]. Truncate an
+alignment if the running alignment score drops too quickly along the
+diagonal of the DP matrix.
+.TP
+.BI -s \ INT
+Minimum DP alignment score [40]. The peak score is computed from the
+final CIGAR.
+.SS GPU options
+.TP 10
+.B --use-gpu
+Enable GPU acceleration for alignment. No configuration file is required.
+.SS Other options
+.TP 10
+.B -h
+Show help message.
+.SH OUTPUT FORMAT
+.PP
+Output is a JSON file containing alignments with CIGAR strings:
+.PP
+.nf
+{
+  "queries": [{
+    "name": "read1",
+    "alignments": [{
+      "mapq": 60,
+      "cigar": "800M",
+      "qs": 0, "qe": 800,
+      "rs": 1000, "re": 1800
+    }]
+  }]
+}
+.fi
+.SH EXAMPLES
+.PP
+Basic alignment with ONT preset:
+.PP
+.RS 4
+.B mm2_align -x map-ont ref.fa reads.fq -c chains.json -o align.json
+.RE
+.PP
+GPU-accelerated alignment:
+.PP
+.RS 4
+.B mm2_align --use-gpu ref.fa reads.fq -c chains.json -o align.json
+.RE
+.PP
+Custom scoring parameters:
+.PP
+.RS 4
+.B mm2_align -A 1 -B 2 -O 2,10 -E 1,1 -z 200,100 ref.fa reads.fq -c chains.json -o out.json
+.RE
+.PP
+Full staged pipeline:
+.PP
+.RS 4
+.nf
+mm2_seed -x map-ont ref.fa reads.fq -o seeds.json
+mm2_chain -x map-ont ref.fa -s seeds.json -o chains.json
+mm2_align -x map-ont ref.fa reads.fq -c chains.json -o align.json
+.fi
+.RE
+.SH SEE ALSO
+.PP
+mm2_seed(1), mm2_chain(1), minimap2(1)

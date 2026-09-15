@@ -1,0 +1,426 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 18,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/out/${presetName}/build",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/${presetName}/install"
+      }
+    },
+    {
+      "name": "amd-default",
+      "displayName": "AMD GPU (Auto-detect)",
+      "description": "Build for AMD GPU with auto-detected architecture",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BUILD_TESTING": "ON",
+        "BUILD_EXTRA": "ON",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "gfx942",
+      "displayName": "gfx942 Architecture",
+      "description": "Build for gfx942 architecture (MI300X, MI300A)",
+      "inherits": "default",
+      "cacheVariables": {
+        "GPU": "AMD",
+        "GPUARCH": "gfx942"
+      }
+    },
+    {
+      "name": "cpu-only",
+      "displayName": "CPU Only Build",
+      "description": "Build without GPU support (CPU-only mode)",
+      "inherits": "default",
+      "cacheVariables": {
+        "GPU": "NONE"
+      }
+    },
+    {
+      "name": "debug-info",
+      "displayName": "Debug Info",
+      "description": "Build with debug print statements",
+      "inherits": "default",
+      "cacheVariables": {
+        "DEBUG_MODE": "info",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "debug-analyze",
+      "displayName": "Debug Analyze",
+      "description": "Build with debug checks and kernel analysis",
+      "inherits": "default",
+      "cacheVariables": {
+        "DEBUG_MODE": "analyze",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "debug-verbose",
+      "displayName": "Debug Verbose",
+      "description": "Build with full debug info and verbose output",
+      "inherits": "default",
+      "cacheVariables": {
+        "DEBUG_MODE": "verbose",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Code Coverage (GCC)",
+      "description": "Build with GCC code coverage support (gcov, CPU-only — GPU device code coverage requires ROCm-specific tooling)",
+      "inherits": "default",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "ENABLE_COVERAGE": "ON",
+        "GPU": "NONE"
+      }
+    },
+    {
+      "name": "coverage-clang",
+      "displayName": "Code Coverage (Clang)",
+      "description": "Build with Clang code coverage support (llvm-cov). Uses the ROCm Clang toolchain for host and GPU/HIP host-side code so all profile data shares one format; device kernel code is not instrumented (no ROCm device profile runtime).",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "/opt/rocm/llvm/bin/clang",
+        "CMAKE_CXX_COMPILER": "/opt/rocm/llvm/bin/clang++",
+        "BUILD_TESTING": "ON",
+        "ENABLE_COVERAGE": "ON",
+        "COVERAGE_TYPE": "LLVM",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "AddressSanitizer",
+      "description": "Build with AddressSanitizer",
+      "inherits": "default",
+      "cacheVariables": {
+        "ENABLE_ASAN": "ON",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "ThreadSanitizer",
+      "description": "Build with ThreadSanitizer",
+      "inherits": "default",
+      "cacheVariables": {
+        "ENABLE_TSAN": "ON",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "sse2-only",
+      "displayName": "SSE2 Only",
+      "description": "Build with SSE2 only (no SSE4.1)",
+      "inherits": "default",
+      "cacheVariables": {
+        "SSE2_ONLY": "ON",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "with-extras",
+      "displayName": "With Extra Tools",
+      "description": "Build with sdust and minimap2-lite",
+      "inherits": "default",
+      "cacheVariables": {
+        "BUILD_EXTRA": "ON",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release Build",
+      "description": "Optimized release build",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "profile",
+      "displayName": "Profile Build",
+      "description": "Optimized build with debug symbols, profiling instrumentation (ITT/ROCTX), and GPU kernel resource-usage analysis",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BUILD_TESTING": "ON",
+        "ENABLE_PROFILING": "ON",
+        "ENABLE_TRACE": "ON",
+        "DEBUG_MODE": "analyze",
+        "GPU": "AMD"
+      }
+    },
+    {
+      "name": "release-gfx942",
+      "displayName": "Release Build (gfx942)",
+      "description": "Optimized release build for gfx942 architecture",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "GPU": "AMD",
+        "GPUARCH": "gfx942"
+      }
+    },
+    {
+      "name": "release-gfx950",
+      "displayName": "Release Build (gfx950)",
+      "description": "Optimized release build for gfx950 architecture (MI355X)",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "GPU": "AMD",
+        "GPUARCH": "gfx950"
+      }
+    },
+    {
+      "name": "gfx1100",
+      "displayName": "gfx1100 Architecture",
+      "description": "Build for gfx1100 architecture (Radeon RX 7900XTX/7900XT, RDNA 3)",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BUILD_TESTING": "ON",
+        "GPU": "AMD",
+        "GPUARCH": "gfx1100"
+      }
+    },
+    {
+      "name": "test-cpu",
+      "displayName": "Test CPU",
+      "description": "CPU build with unit tests enabled",
+      "inherits": "default",
+      "cacheVariables": {
+        "GPU": "NONE",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "package-base",
+      "hidden": true,
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_EXTRA": "OFF",
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "package-base-amd",
+      "hidden": true,
+      "inherits": "package-base",
+      "cacheVariables": {
+        "GPU": "AMD",
+        "GPUARCH": "gfx942;gfx950"
+      }
+    },
+    {
+      "name": "deb-package",
+      "displayName": "Debian Package (CPU)",
+      "description": "Release build configured for .deb package creation (CPU-only)",
+      "inherits": "package-base",
+      "cacheVariables": {
+        "GPU": "NONE",
+        "BUILD_DEB_PACKAGE": "ON"
+      }
+    },
+    {
+      "name": "deb-package-amd",
+      "displayName": "Debian Package (AMD GPU)",
+      "description": "Release build configured for .deb package creation with AMD GPU support",
+      "inherits": "package-base-amd",
+      "cacheVariables": {
+        "BUILD_DEB_PACKAGE": "ON"
+      }
+    },
+    {
+      "name": "rpm-package",
+      "displayName": "RPM Package (CPU)",
+      "description": "Release build configured for .rpm package creation (CPU-only)",
+      "inherits": "package-base",
+      "cacheVariables": {
+        "GPU": "NONE",
+        "BUILD_RPM_PACKAGE": "ON"
+      }
+    },
+    {
+      "name": "rpm-package-amd",
+      "displayName": "RPM Package (AMD GPU)",
+      "description": "Release build configured for .rpm package creation with AMD GPU support",
+      "inherits": "package-base-amd",
+      "cacheVariables": {
+        "BUILD_RPM_PACKAGE": "ON"
+      }
+    },
+    {
+      "name": "sles-rpm-package",
+      "displayName": "SLES 15 RPM Package (CPU)",
+      "description": "Release build configured for SLES 15 .rpm package creation (CPU-only)",
+      "inherits": "package-base",
+      "cacheVariables": {
+        "GPU": "NONE",
+        "BUILD_SLES_RPM_PACKAGE": "ON"
+      }
+    },
+    {
+      "name": "sles-rpm-package-amd",
+      "displayName": "SLES 15 RPM Package (AMD GPU)",
+      "description": "Release build configured for SLES 15 .rpm package creation with AMD GPU support",
+      "inherits": "package-base-amd",
+      "cacheVariables": {
+        "BUILD_SLES_RPM_PACKAGE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "amd-default",
+      "jobs": 0
+    },
+    {
+      "name": "amd-default",
+      "configurePreset": "amd-default",
+      "jobs": 0
+    },
+    {
+      "name": "gfx942",
+      "configurePreset": "gfx942",
+      "jobs": 0
+    },
+    {
+      "name": "cpu-only",
+      "configurePreset": "cpu-only",
+      "jobs": 0
+    },
+    {
+      "name": "debug-info",
+      "configurePreset": "debug-info",
+      "jobs": 0
+    },
+    {
+      "name": "debug-analyze",
+      "configurePreset": "debug-analyze",
+      "jobs": 0
+    },
+    {
+      "name": "debug-verbose",
+      "configurePreset": "debug-verbose",
+      "jobs": 0
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "jobs": 0
+    },
+    {
+      "name": "coverage-clang",
+      "configurePreset": "coverage-clang",
+      "jobs": 0
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "jobs": 0
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
+      "jobs": 0
+    },
+    {
+      "name": "sse2-only",
+      "configurePreset": "sse2-only",
+      "jobs": 0
+    },
+    {
+      "name": "with-extras",
+      "configurePreset": "with-extras",
+      "jobs": 0
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "jobs": 0
+    },
+    {
+      "name": "profile",
+      "configurePreset": "profile",
+      "jobs": 0
+    },
+    {
+      "name": "release-gfx942",
+      "configurePreset": "release-gfx942",
+      "jobs": 0
+    },
+    {
+      "name": "release-gfx950",
+      "configurePreset": "release-gfx950",
+      "jobs": 0
+    },
+    {
+      "name": "gfx1100",
+      "configurePreset": "gfx1100",
+      "jobs": 0
+    },
+    {
+      "name": "test-cpu",
+      "configurePreset": "test-cpu",
+      "jobs": 0
+    },
+    {
+      "name": "deb-package",
+      "configurePreset": "deb-package",
+      "jobs": 0
+    },
+    {
+      "name": "deb-package-amd",
+      "configurePreset": "deb-package-amd",
+      "jobs": 0
+    },
+    {
+      "name": "rpm-package",
+      "configurePreset": "rpm-package",
+      "jobs": 0
+    },
+    {
+      "name": "rpm-package-amd",
+      "configurePreset": "rpm-package-amd",
+      "jobs": 0
+    },
+    {
+      "name": "sles-rpm-package",
+      "configurePreset": "sles-rpm-package",
+      "jobs": 0
+    },
+    {
+      "name": "sles-rpm-package-amd",
+      "configurePreset": "sles-rpm-package-amd",
+      "jobs": 0
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-cpu",
+      "configurePreset": "test-cpu",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

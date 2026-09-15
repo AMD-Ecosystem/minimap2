@@ -1,0 +1,113 @@
+.TH mm2_seed 1 "18 February 2026" "minimap2-2.24" "Bioinformatics tools"
+.SH NAME
+.PP
+mm2_seed \- find minimizer seed matches for minimap2 staged pipeline
+.SH SYNOPSIS
+.PP
+.B mm2_seed
+.RB [ -x
+.IR preset ]
+.RB [ -k
+.IR INT ]
+.RB [ -w
+.IR INT ]
+.RB [ options ]
+.I reference.fa
+.I query.fa
+.B -o
+.I output.json
+.SH DESCRIPTION
+.PP
+.B mm2_seed
+is a CLI tool that performs the seeding stage of the minimap2 mapping
+pipeline. It finds minimizer seed matches between query and reference
+sequences and outputs them in JSON format for downstream processing
+by
+.BR mm2_chain (1).
+.PP
+This tool is designed for debugging, algorithm analysis, and educational
+purposes. For end-to-end alignment workflows, use
+.BR minimap2 (1)
+instead.
+.SH OPTIONS
+.SS Preset
+.TP 10
+.BI -x \ STR
+Preset configuration. Available presets:
+.BR map-ont ,
+.BR map-pb ,
+.BR map-hifi ,
+.BR asm5 / asm10 / asm20 ,
+.BR sr ,
+.BR splice .
+.SS Indexing options
+.TP 10
+.BI -k \ INT
+K-mer size [15].
+.TP
+.BI -w \ INT
+Minimizer window size [10].
+.SS Seed filtering options
+.TP 10
+.BI -d \ INT
+SDUST threshold for masking low-complexity regions [0, disabled].
+.TP
+.BI -m \ INT
+Max occurrence threshold. Minimizers occurring more than
+.I INT
+times are filtered out [auto-computed from index].
+.TP
+.BI -M \ INT
+Hard max occurrence limit [4095].
+.TP
+.BI -D \ INT
+Occurrence distance for selective filtering [500].
+.SS Output options
+.TP 10
+.BI -o \ FILE
+Output JSON file (required).
+.TP
+.B -h
+Show help message.
+.SH OUTPUT FORMAT
+.PP
+Output is a JSON file containing an array of queries, each with its
+seed matches:
+.PP
+.nf
+{
+  "index_params": { "k": 15, "w": 10 },
+  "queries": [{
+    "name": "read1",
+    "length": 1000,
+    "n_seeds": 42,
+    "seeds": [...]
+  }]
+}
+.fi
+.SH EXAMPLES
+.PP
+Basic seeding with ONT preset:
+.PP
+.RS 4
+.B mm2_seed -x map-ont ref.fa reads.fq -o seeds.json
+.RE
+.PP
+Custom k-mer and window size:
+.PP
+.RS 4
+.B mm2_seed -k 19 -w 10 ref.fa reads.fq -o seeds.json
+.RE
+.PP
+Full staged pipeline:
+.PP
+.RS 4
+.nf
+mm2_seed -x map-ont ref.fa reads.fq -o seeds.json
+mm2_chain -x map-ont ref.fa -s seeds.json -o chains.json
+mm2_align -x map-ont ref.fa reads.fq -c chains.json -o align.json
+.fi
+.RE
+.SH SEE ALSO
+.PP
+mm2_chain(1), mm2_align(1), minimap2(1)

@@ -1,0 +1,5 @@
+# ROCm-LS team owns the AMD GPU fork of minimap2
+* @AMD-AIOSS/rocm-ls
+
+# CI and pipeline scripts
+.github/ @AMD-AIOSS/rocm-ls

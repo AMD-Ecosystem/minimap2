@@ -1,0 +1,50 @@
+# CI-specific .dockerignore for Kaniko builds.
+# Based on the source repo's .dockerignore with two changes:
+#   1. Added .venv/ — broken symlinks crash Kaniko during COPY
+#   2. Removed test_suite/ and *.fa/*.fasta/*.fastq exclusions — needed
+#      for unit tests that run inside the build image
+
+# Python venv (may contain broken symlinks)
+.venv/
+.venv
+
+# Build artifacts
+build/
+build*/
+cmake-build*/
+out
+*.o
+*.a
+
+# Test results (not data)
+debug/
+*.sam
+*.paf
+*.tsv
+ctest_output*
+
+# Development / CI files
+.devcontainer/
+.git/
+.github/
+.vscode/
+.gitmodules
+.clang-format
+.clang-tidy
+.pre-commit-config.yaml
+
+# Standalone GPU benchmark tool
+ksw2_gpu_standalone/
+minimap2/ksw2_gpu
+
+# Package artifacts
+deb_package/
+*.deb
+*.rpm
+*.sif
+*.pdf
+
+# Packaging / documentation (not needed in build context)
+packaging/
+tex/
+docs/

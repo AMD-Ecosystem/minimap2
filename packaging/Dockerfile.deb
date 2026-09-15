@@ -1,0 +1,197 @@
+# Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
+#
+# SPDX-License-Identifier: MIT
+# =============================================================================
+# minimap2 Ubuntu .deb Builder / Runtime
+# =============================================================================
+# Single multi-stage Dockerfile used by both:
+#   - Standalone local builds / smoke tests
+#   - The AMD CI builder-tester pipeline (via BuildKit)
+#
+# Stages:
+#   rocm-base  Shared ROCm repo setup + dpkg-exclude patches (cached).
+#   builder    Full SDK; compiles minimap2; produces .deb + CI artifact bundle.
+#   artifacts  scratch stage for CI extraction (--output type=local).
+#   runtime    Slim image: installs the .deb and runs smoke tests.
+#
+# Usage:
+#   Standalone:
+#     docker build -f packaging/Dockerfile.deb \
+#       --build-arg BASE_IMAGE=ubuntu:noble \
+#       --build-arg ROCM_VERSION=7.2.1 \
+#       -t minimap2-deb-test .
+#     docker run --rm --device=/dev/kfd --device=/dev/dri minimap2-deb-test
+#
+#   CI (BuildKit):
+#     buildctl build ... --opt target=artifacts --output type=local,dest=...
+#     buildctl build ... --opt target=runtime   --output type=oci,dest=...
+#
+# Build args:
+#   ROCM_VERSION     e.g. 7.2.1
+#   BASE_IMAGE       e.g. ubuntu:noble, ubuntu:jammy (Ubuntu codename derived
+#                    automatically via lsb_release inside the image)
+#   BUILD_TESTING    ON | OFF (default OFF). When ON the CTest tree is built
+#                    and included in minimap2-tests.tar.gz. When OFF the
+#                    tarball still ships (containing just the source tree)
+#                    so the `builder` stage succeeds regardless.
+#   GPUARCH          Semicolon-separated list of AMD GPU archs, e.g.
+#                    "gfx942;gfx950". Defaults to "gfx942;gfx950"
+#                    (MI300X/MI325X + MI350X/MI355X).
+# =============================================================================
+
+ARG ROCM_VERSION=7.2.1
+ARG BASE_IMAGE=ubuntu:noble
+
+# ---- Stage 0: rocm-base -----------------------------------------------------
+# Shared base: apt + ROCm repo + dpkg-exclude patches. Inherited by both
+# builder and runtime so ROCm setup is cached once across downstream stages.
+FROM ${BASE_IMAGE} AS rocm-base
+
+ARG ROCM_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget lsb-release ca-certificates && \
+    UBUNTU_CODENAME=$(lsb_release -cs) && \
+    MAJOR=$(echo ${ROCM_VERSION} | cut -d. -f1) && \
+    MINOR=$(echo ${ROCM_VERSION} | cut -d. -f2) && \
+    PATCH=$(echo ${ROCM_VERSION} | cut -d. -f3) && \
+    PATCH=${PATCH:-0} && \
+    VERNUM=$((MAJOR * 10000 + MINOR * 100 + PATCH)) && \
+    if [ "${PATCH}" = "0" ]; then SHORT_VERSION="${MAJOR}.${MINOR}"; else SHORT_VERSION="${MAJOR}.${MINOR}.${PATCH}"; fi && \
+    wget -q "https://repo.radeon.com/amdgpu-install/${SHORT_VERSION}/ubuntu/${UBUNTU_CODENAME}/amdgpu-install_${SHORT_VERSION}.${VERNUM}-1_all.deb" \
+         -O /tmp/amdgpu-install.deb && \
+    apt-get install -y /tmp/amdgpu-install.deb && \
+    rm /tmp/amdgpu-install.deb && \
+    apt-get update && \
+    rm -rf /var/lib/apt/lists/*
+
+# Remove dpkg path excludes so man pages and docs install correctly on minimal
+# base images (ubuntu:* ships /etc/dpkg/dpkg.cfg.d/excludes with path-excludes
+# for /usr/share/man and /usr/share/doc).
+RUN if [ -f /etc/dpkg/dpkg.cfg.d/excludes ]; then \
+        sed -i '/path-exclude=\/usr\/share\/man/d;/path-exclude=\/usr\/share\/doc/d' \
+            /etc/dpkg/dpkg.cfg.d/excludes; \
+    fi
+
+# ---- Stage 1: builder -------------------------------------------------------
+# Installs full SDK, compiles minimap2, produces .deb + CI artifact bundle.
+FROM rocm-base AS builder
+
+ARG BUILD_TESTING=OFF
+ARG GPUARCH=gfx942;gfx950
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential git cmake ninja-build dpkg-dev zlib1g-dev \
+        python3-setuptools python3-wheel \
+        rocm-hip-sdk && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY . /src
+RUN git config --global --add safe.directory /src
+
+RUN cmake -S /src -B /build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DGPU=AMD \
+        -DGPUARCH="${GPUARCH}" \
+        -DBUILD_DEB_PACKAGE=ON \
+        -DBUILD_EXTRA=OFF \
+        -DBUILD_TESTING=${BUILD_TESTING} \
+        -DCMAKE_INSTALL_PREFIX=/usr && \
+    cmake --build /build -j$(nproc) && \
+    cd /build && cpack -G DEB
+
+# Install .deb in the builder to capture `minimap2 --version` for version.txt
+# below (CI artifact). Harmless for standalone builds (only reached if the
+# subsequent /ci-artifacts RUN is executed, which it always is in this stage).
+RUN apt-get update && \
+    apt-get install -y /build/packages/amd-minimap2*.deb && \
+    rm -rf /var/lib/apt/lists/*
+
+FROM builder AS ci-artifacts-builder
+
+# Bundle CI artifacts: .deb, version.txt, minimap2-tests.tar.gz.
+# minimap2-tests.tar.gz ships the source tree + CTest metadata so the
+# downstream tester image can run `ctest` against the installed .deb.
+RUN mkdir -p /ci-artifacts && \
+    DEB=$(find /build/packages -maxdepth 1 -name "amd-minimap2*.deb" | head -1) && \
+    cp "${DEB}" /ci-artifacts/ && \
+    VERSION=$(minimap2 --version 2>/dev/null | sed 's/^minimap2-//' || true) && \
+    echo "${VERSION:-unknown}" > /ci-artifacts/version.txt && \
+    : > /tmp/ctest-files.txt && \
+    find /build -name 'CTestTestfile.cmake' | sed 's|^/||' >> /tmp/ctest-files.txt && \
+    if [ -d /build/tests ]; then echo "build/tests" >> /tmp/ctest-files.txt; fi && \
+    tar -czf /ci-artifacts/minimap2-tests.tar.gz -C / \
+        --exclude='src/.git' \
+        src \
+        -T /tmp/ctest-files.txt
+
+# ---- Stage 2: artifacts -----------------------------------------------------
+# Scratch stage used by CI (buildctl --output type=local) to extract the
+# .deb, version.txt, and minimap2-tests.tar.gz directly to the host.
+# Never executed by standalone `docker build` without an explicit --target.
+FROM scratch AS artifacts
+COPY --from=ci-artifacts-builder /ci-artifacts/ /
+
+# ---- Stage 3: runtime -------------------------------------------------------
+# Slim image: inherits ROCm repo from rocm-base, installs only the .deb, and
+# runs an assertive smoke test. Relies on the .deb's declared runtime deps
+# (hip-runtime-amd, zlib1g) rather than installing the full rocm metapackage.
+FROM rocm-base AS runtime
+
+# bash is required below for `set -o pipefail`; default /bin/sh on Ubuntu is
+# dash, which does not support pipefail.
+SHELL ["/bin/bash", "-c"]
+
+# Install .deb with runtime deps and smoke-test atomically in one layer.
+# pipefail is critical so failures inside `dpkg -L ... | grep -q` pipelines
+# propagate (otherwise only grep's exit code would be seen).
+COPY --from=builder /build/packages/amd-minimap2*.deb /tmp/
+RUN set -euxo pipefail; \
+    apt-get update; \
+    apt-get install -y /tmp/amd-minimap2*.deb; \
+    rm -f /tmp/*.deb; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*; \
+    echo "=== DEB package info ==="; \
+    dpkg -s amd-minimap2; \
+    echo "=== Installed files ==="; \
+    dpkg -L amd-minimap2; \
+    echo "=== Verify binaries ==="; \
+    minimap2 --version; \
+    mm2_seed  -h >/dev/null; \
+    mm2_chain -h >/dev/null; \
+    mm2_align -h >/dev/null; \
+    mm2_seed  -h | head -n 3 || true; \
+    mm2_chain -h | head -n 3 || true; \
+    mm2_align -h | head -n 3 || true; \
+    echo "=== Verify docs/man package payload entries ==="; \
+    dpkg -L amd-minimap2 | grep -q '^/usr/share/man/man1/minimap2\.1\.gz$'; \
+    dpkg -L amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_seed\.1\.gz$'; \
+    dpkg -L amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_chain\.1\.gz$'; \
+    dpkg -L amd-minimap2 | grep -q '^/usr/share/man/man1/mm2_align\.1\.gz$'; \
+    dpkg -L amd-minimap2 | grep -q '^/usr/share/doc/minimap2/USAGE\.md$'; \
+    dpkg -L amd-minimap2 | grep -q '^/usr/share/doc/minimap2/LICENSE\.txt$'; \
+    dpkg -L amd-minimap2 | grep -q '^/usr/share/doc/minimap2/NEWS\.md$'; \
+    echo "=== Verify docs/man runtime files (best-effort) ==="; \
+    if [ -f /usr/share/man/man1/minimap2.1.gz ]; then \
+        test -f /usr/share/man/man1/mm2_seed.1.gz; \
+        test -f /usr/share/man/man1/mm2_chain.1.gz; \
+        test -f /usr/share/man/man1/mm2_align.1.gz; \
+    else \
+        echo "man pages not installed in runtime image (likely excludedocs), skipping strict file checks"; \
+    fi; \
+    if [ -f /usr/share/doc/minimap2/USAGE.md ]; then \
+        test -f /usr/share/doc/minimap2/LICENSE.txt; \
+        test -f /usr/share/doc/minimap2/NEWS.md; \
+    else \
+        echo "docs not installed in runtime image (likely excludedocs), skipping strict file checks"; \
+    fi; \
+    echo "=== Verify shared library ==="; \
+    test -f /usr/lib/x86_64-linux-gnu/libminimap2.so; \
+    echo "=== Verify GPU config ==="; \
+    test -f /usr/share/minimap2/configs/gpu_config.json; \
+    echo "=== Runtime smoke test passed ==="
+
+CMD ["/bin/bash"]

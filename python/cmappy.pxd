@@ -1,6 +1,23 @@
+# Modifications Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
 from libc.stdint cimport int8_t, uint8_t, int32_t, int64_t, uint32_t, uint64_t
 
 cdef extern from "minimap.h":
+	#
+	# Version
+	#
+	ctypedef struct mm_version_t:
+		int major
+		int minor
+		int patch
+		const char *full
+		const char *prerelease
+		const char *git_hash
+		const char *git_short
+		int git_dirty
+
+	const char *mm_version()
+	const mm_version_t *mm_version_info()
+
 	#
 	# Options
 	#
@@ -65,8 +82,22 @@ cdef extern from "minimap.h":
 
 		const char *split_prefix
 
+		const char *gpu_config_file
+		int gpu_chain_workers
+		int gpu_flush_threshold
+		int gpu_batch_max_align
+		int64_t gpu_batch_max_mem
+		int gpu_accum_pool_size
+		int64_t gpu_batch_max_mem_cap
+		int *gpu_device_ids
+		int gpu_num_devices
+
 	int mm_set_opt(char *preset, mm_idxopt_t *io, mm_mapopt_t *mo)
 	int mm_verbose
+
+	int64_t MM_F_GPU_CHAIN
+	int64_t MM_F_GPU_ALIGN
+
 
 	#
 	# Indexing
@@ -115,6 +146,23 @@ cdef extern from "minimap.h":
 	int mm_gen_ds(void *km, char **buf, int *max_len, const mm_idx_t *mi, const mm_reg1_t *r, const char *seq, int no_iden)
 	int mm_gen_MD(void *km, char **buf, int *max_len, const mm_idx_t *mi, const mm_reg1_t *r, const char *seq)
 
+	#
+	# Logger + mapping context (shared per-run state; owns GPU sub-contexts)
+	#
+	ctypedef struct mm_logger_t:
+		pass
+
+	mm_logger_t *mm_logger_create(int async_mode, const char *debug_file)
+	void mm_logger_destroy(mm_logger_t *logger)
+
+	ctypedef struct mm_mapctx_t:
+		pass
+
+	mm_mapctx_t *mm_mapctx_create(mm_logger_t *logger, const mm_mapopt_t *opt, int n_threads)
+	void mm_mapctx_destroy(mm_mapctx_t *ctx)
+	void mm_mapctx_reset(mm_mapctx_t *ctx)
+
+
 #
 # Helper header (because it is hard to expose mm_reg1_t with Cython)
 #
@@ -133,6 +181,8 @@ cdef extern from "cmappy.h":
 	void mm_reg2hitpy(const mm_idx_t *mi, mm_reg1_t *r, mm_hitpy_t *h)
 	void mm_free_reg1(mm_reg1_t *r)
 	mm_reg1_t *mm_map_aux(const mm_idx_t *mi, const char* seqname, const char *seq1, const char *seq2, int *n_regs, mm_tbuf_t *b, const mm_mapopt_t *opt)
+	mm_reg1_t *mm_map_aux_ctx(const mm_idx_t *mi, const char* seqname, const char *seq1, const char *seq2, int *n_regs, mm_tbuf_t *b, const mm_mapopt_t *opt, mm_mapctx_t *mapctx, int slot)
+	int mm_map_batch_ctx(const mm_idx_t *mi, int n_seqs, const char *const *names, const char *const *seqs, const mm_mapopt_t *opt, int n_threads, mm_mapctx_t *mapctx, int *out_n_regs, mm_reg1_t **out_regs) nogil
 	char *mappy_fetch_seq(const mm_idx_t *mi, const char *name, int st, int en, int *l)
 	mm_idx_t *mappy_idx_seq(int w, int k, int is_hpc, int bucket_bits, const char *seq, int l)
 

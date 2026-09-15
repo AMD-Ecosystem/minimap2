@@ -1,0 +1,76 @@
+// FlatBuffers schema for minimap2 per-query intermediate dump.
+// Seeds use struct (inline, zero-overhead). Chains and alignments use
+// table (supports schema evolution — fields can be added later).
+
+namespace mm2.dump;
+
+// 16 bytes inline — identical to mm128_t
+struct Anchor {
+  x: uint64;
+  y: uint64;
+}
+
+struct QueryMeta {
+  qlen_sum: int32;
+  n_seg: int32;
+  rep_len: int32;
+  n_mini_pos: int32;
+  frag_gap: int32;
+  k: int32;
+  w: int32;
+}
+
+table Chain {
+  score: int32;
+  seed_offset: uint32;
+  length: int32;
+  first_qpos: int32;
+  first_tpos: int32;
+  last_qpos: int32;
+  last_tpos: int32;
+  rev: int32;
+  rid: int32;
+  rname: string;
+}
+
+table Alignment {
+  seg_id: int32;
+  rid: int32;
+  score: int32;
+  score0: int32;
+  dp_score: int32;
+  qs: int32;
+  qe: int32;
+  rs: int32;
+  re: int32;
+  mapq: int32;
+  rev: int32;
+  mlen: int32;
+  blen: int32;
+  n_sub: int32;
+  sam_pri: int32;
+  n_cigar_ops: int32;
+  dp_max: int32;
+  dp_max2: int32;
+  n_ambi: int32;
+  chain_idx: int32 = -1;
+  split: int32;
+  parent: int32 = -1;
+  inv: int32;
+  subsc: int32;
+  anchor_offset: int32;
+  rname: string;
+  cigar: string;
+}
+
+table QueryDump {
+  name: string;
+  meta: QueryMeta;
+  seeds: [Anchor];
+  chained_seed_indices: [uint32];
+  chains: [Chain];
+  alignments: [Alignment];
+}
+
+root_type QueryDump;
+file_identifier "MM2D";

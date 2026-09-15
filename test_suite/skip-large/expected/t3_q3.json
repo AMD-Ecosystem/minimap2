@@ -1,0 +1,117 @@
+{
+  "name": "skip_large_t3_q3",
+  "description": "Test data for skip-large: t3 vs q3",
+  "reference": {
+    "file": "../t3.fa"
+  },
+  "query": {
+    "file": "../q3.fa"
+  },
+  "index_params": {
+    "k": 15,
+    "w": 10
+  },
+  "queries": [
+    {
+      "name": "q1",
+      "expected_anchors": [
+        {
+          "x": "17179876888",
+          "y": "2202"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q2",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q3",
+      "expected_anchors": [
+        {
+          "x": "3725",
+          "y": "1120"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q4",
+      "expected_anchors": [
+        {
+          "x": "34359746765",
+          "y": "1769"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q5",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q6",
+      "expected_anchors": [
+        {
+          "x": "9223372036854777393",
+          "y": "6098"
+        },
+        {
+          "x": "9223372036854777394",
+          "y": "6099"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q7",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q8",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q9",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q10",
+      "expected_anchors": [
+        {
+          "x": "8589937145",
+          "y": "6599"
+        }
+      ],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q11",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    },
+    {
+      "name": "q12",
+      "expected_anchors": [],
+      "expected_chains": [],
+      "expected_alignments": []
+    }
+  ]
+}
